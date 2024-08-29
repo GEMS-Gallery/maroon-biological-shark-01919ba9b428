@@ -23,6 +23,7 @@ const ControlsContainer = styled(Box)(({ theme }) => ({
 
 const App: React.FC = () => {
   const [callId, setCallId] = useState<string | null>(null);
+  const [inputCallId, setInputCallId] = useState<string>('');
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,11 +60,12 @@ const App: React.FC = () => {
   };
 
   const joinCall = async () => {
-    if (!callId) return;
+    if (!inputCallId) return;
     setIsLoading(true);
     try {
-      const result = await backend.joinCall(BigInt(callId));
+      const result = await backend.joinCall(BigInt(inputCallId));
       if ('ok' in result) {
+        setCallId(inputCallId);
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         setLocalStream(stream);
         // Here you would typically set up WebRTC connection
@@ -83,6 +85,7 @@ const App: React.FC = () => {
       const result = await backend.endCall(BigInt(callId));
       if ('ok' in result) {
         setCallId(null);
+        setInputCallId('');
         if (localStream) {
           localStream.getTracks().forEach(track => track.stop());
           setLocalStream(null);
@@ -118,23 +121,33 @@ const App: React.FC = () => {
       </VideoContainer>
       <ControlsContainer>
         {!callId && (
-          <Button variant="contained" color="primary" onClick={startCall} disabled={isLoading}>
-            {isLoading ? <CircularProgress size={24} /> : 'Start Call'}
-          </Button>
+          <>
+            <Button variant="contained" color="primary" onClick={startCall} disabled={isLoading} sx={{ mr: 2 }}>
+              {isLoading ? <CircularProgress size={24} /> : 'Start Call'}
+            </Button>
+            <TextField
+              value={inputCallId}
+              onChange={(e) => setInputCallId(e.target.value)}
+              label="Enter Call ID"
+              variant="outlined"
+              size="small"
+              sx={{ mr: 2 }}
+            />
+            <Button variant="contained" color="secondary" onClick={joinCall} disabled={isLoading || !inputCallId}>
+              {isLoading ? <CircularProgress size={24} /> : 'Join Call'}
+            </Button>
+          </>
         )}
         {callId && (
           <>
             <TextField
               value={callId}
-              label="Call ID"
+              label="Current Call ID"
               variant="outlined"
               size="small"
               sx={{ mr: 2 }}
               InputProps={{ readOnly: true }}
             />
-            <Button variant="contained" color="secondary" onClick={joinCall} disabled={isLoading} sx={{ mr: 2 }}>
-              {isLoading ? <CircularProgress size={24} /> : 'Join Call'}
-            </Button>
             <Button variant="contained" color="error" onClick={endCall} disabled={isLoading}>
               {isLoading ? <CircularProgress size={24} /> : 'End Call'}
             </Button>
