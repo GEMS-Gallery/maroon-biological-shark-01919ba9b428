@@ -1,0 +1,29 @@
+type Result_2 = 
+ variant {
+   err: text;
+   ok: CallSession;
+ };
+type Result_1 = 
+ variant {
+   err: text;
+   ok: CallId;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok;
+ };
+type ParticipantId = principal;
+type CallSession = 
+ record {
+   participants: vec opt ParticipantId;
+   streamData: vec opt blob;
+ };
+type CallId = nat;
+service : {
+  endCall: (CallId) -> (Result);
+  getCallSession: (CallId) -> (Result_2) query;
+  initializeCall: () -> (Result_1);
+  joinCall: (CallId) -> (Result);
+  updateStreamData: (CallId, blob) -> (Result);
+}
