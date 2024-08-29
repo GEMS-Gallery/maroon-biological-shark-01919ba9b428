@@ -1,3 +1,4 @@
+type SDPData = text;
 type Result_2 = 
  variant {
    err: text;
@@ -14,16 +15,21 @@ type Result =
    ok;
  };
 type ParticipantId = principal;
+type ICECandidate = text;
 type CallSession = 
  record {
+   answers: vec opt SDPData;
+   iceCandidates: vec vec ICECandidate;
+   offers: vec opt SDPData;
    participants: vec opt ParticipantId;
-   streamData: vec opt blob;
  };
 type CallId = nat;
 service : {
+  addIceCandidate: (CallId, ICECandidate) -> (Result);
   endCall: (CallId) -> (Result);
   getCallSession: (CallId) -> (Result_2) query;
   initializeCall: () -> (Result_1);
   joinCall: (CallId) -> (Result);
-  updateStreamData: (CallId, blob) -> (Result);
+  sendAnswer: (CallId, SDPData) -> (Result);
+  sendOffer: (CallId, SDPData) -> (Result);
 }

@@ -29,6 +29,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
 
   useEffect(() => {
     if (localStream && localVideoRef.current) {
@@ -42,14 +43,40 @@ const App: React.FC = () => {
     }
   }, [remoteStream]);
 
+  const createPeerConnection = () => {
+    const configuration: RTCConfiguration = {
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    };
+    const pc = new RTCPeerConnection(configuration);
+
+    pc.onicecandidate = async (event) => {
+      if (event.candidate && callId) {
+        await backend.addIceCandidate(BigInt(callId), JSON.stringify(event.candidate));
+      }
+    };
+
+    pc.ontrack = (event) => {
+      setRemoteStream(event.streams[0]);
+    };
+
+    peerConnectionRef.current = pc;
+    return pc;
+  };
+
   const startCall = async () => {
     setIsLoading(true);
     try {
       const result = await backend.initializeCall();
       if ('ok' in result) {
-        setCallId(result.ok.toString());
+        const newCallId = result.ok.toString();
+        setCallId(newCallId);
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         setLocalStream(stream);
+        const pc = createPeerConnection();
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        await backend.sendOffer(BigInt(newCallId), JSON.stringify(offer));
       } else {
         console.error('Failed to initialize call:', result.err);
       }
@@ -68,7 +95,19 @@ const App: React.FC = () => {
         setCallId(inputCallId);
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         setLocalStream(stream);
-        // Here you would typically set up WebRTC connection
+        const pc = createPeerConnection();
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+        const sessionResult = await backend.getCallSession(BigInt(inputCallId));
+        if ('ok' in sessionResult) {
+          const session = sessionResult.ok;
+          if (session.offers[0]) {
+            const offer = JSON.parse(session.offers[0]);
+            await pc.setRemoteDescription(new RTCSessionDescription(offer));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            await backend.sendAnswer(BigInt(inputCallId), JSON.stringify(answer));
+          }
+        }
       } else {
         console.error('Failed to join call:', result.err);
       }
@@ -93,6 +132,10 @@ const App: React.FC = () => {
         if (remoteStream) {
           remoteStream.getTracks().forEach(track => track.stop());
           setRemoteStream(null);
+        }
+        if (peerConnectionRef.current) {
+          peerConnectionRef.current.close();
+          peerConnectionRef.current = null;
         }
       } else {
         console.error('Failed to end call:', result.err);
