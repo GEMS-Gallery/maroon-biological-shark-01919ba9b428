@@ -13,17 +13,17 @@ export type ICECandidate = string;
 export type ParticipantId = Principal;
 export type Result = { 'ok' : null } |
   { 'err' : string };
-export type Result_1 = { 'ok' : CallId } |
+export type Result_1 = { 'ok' : CallSession } |
   { 'err' : string };
-export type Result_2 = { 'ok' : CallSession } |
+export type Result_2 = { 'ok' : CallId } |
   { 'err' : string };
 export type SDPData = string;
 export interface _SERVICE {
   'addIceCandidate' : ActorMethod<[CallId, ICECandidate], Result>,
   'endCall' : ActorMethod<[CallId], Result>,
-  'getCallSession' : ActorMethod<[CallId], Result_2>,
-  'initializeCall' : ActorMethod<[], Result_1>,
-  'joinCall' : ActorMethod<[CallId], Result>,
+  'getCallSession' : ActorMethod<[CallId], Result_1>,
+  'initializeCall' : ActorMethod<[], Result_2>,
+  'joinCall' : ActorMethod<[CallId], Result_1>,
   'sendAnswer' : ActorMethod<[CallId, SDPData], Result>,
   'sendOffer' : ActorMethod<[CallId, SDPData], Result>,
 }

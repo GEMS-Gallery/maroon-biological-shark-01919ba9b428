@@ -10,14 +10,14 @@ export const idlFactory = ({ IDL }) => {
     'offers' : IDL.Vec(IDL.Opt(SDPData)),
     'iceCandidates' : IDL.Vec(IDL.Vec(ICECandidate)),
   });
-  const Result_2 = IDL.Variant({ 'ok' : CallSession, 'err' : IDL.Text });
-  const Result_1 = IDL.Variant({ 'ok' : CallId, 'err' : IDL.Text });
+  const Result_1 = IDL.Variant({ 'ok' : CallSession, 'err' : IDL.Text });
+  const Result_2 = IDL.Variant({ 'ok' : CallId, 'err' : IDL.Text });
   return IDL.Service({
     'addIceCandidate' : IDL.Func([CallId, ICECandidate], [Result], []),
     'endCall' : IDL.Func([CallId], [Result], []),
-    'getCallSession' : IDL.Func([CallId], [Result_2], ['query']),
-    'initializeCall' : IDL.Func([], [Result_1], []),
-    'joinCall' : IDL.Func([CallId], [Result], []),
+    'getCallSession' : IDL.Func([CallId], [Result_1], ['query']),
+    'initializeCall' : IDL.Func([], [Result_2], []),
+    'joinCall' : IDL.Func([CallId], [Result_1], []),
     'sendAnswer' : IDL.Func([CallId, SDPData], [Result], []),
     'sendOffer' : IDL.Func([CallId, SDPData], [Result], []),
   });

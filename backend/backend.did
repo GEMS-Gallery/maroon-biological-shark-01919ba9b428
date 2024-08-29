@@ -2,12 +2,12 @@ type SDPData = text;
 type Result_2 = 
  variant {
    err: text;
-   ok: CallSession;
+   ok: CallId;
  };
 type Result_1 = 
  variant {
    err: text;
-   ok: CallId;
+   ok: CallSession;
  };
 type Result = 
  variant {
@@ -27,9 +27,9 @@ type CallId = nat;
 service : {
   addIceCandidate: (CallId, ICECandidate) -> (Result);
   endCall: (CallId) -> (Result);
-  getCallSession: (CallId) -> (Result_2) query;
-  initializeCall: () -> (Result_1);
-  joinCall: (CallId) -> (Result);
+  getCallSession: (CallId) -> (Result_1) query;
+  initializeCall: () -> (Result_2);
+  joinCall: (CallId) -> (Result_1);
   sendAnswer: (CallId, SDPData) -> (Result);
   sendOffer: (CallId, SDPData) -> (Result);
 }

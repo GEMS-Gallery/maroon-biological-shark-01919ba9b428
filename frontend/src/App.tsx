@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { backend } from 'declarations/backend';
-import { Button, TextField, CircularProgress, Box, Typography } from '@mui/material';
+import { Button, TextField, CircularProgress, Box, Typography, Snackbar } from '@mui/material';
 import { styled } from '@mui/system';
 
 const VideoContainer = styled(Box)(({ theme }) => ({
@@ -27,6 +27,7 @@ const App: React.FC = () => {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState<string>('');
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -43,7 +44,7 @@ const App: React.FC = () => {
     }
   }, [remoteStream]);
 
-  const createPeerConnection = () => {
+  const createPeerConnection = useCallback(() => {
     const configuration: RTCConfiguration = {
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     };
@@ -51,7 +52,12 @@ const App: React.FC = () => {
 
     pc.onicecandidate = async (event) => {
       if (event.candidate && callId) {
-        await backend.addIceCandidate(BigInt(callId), JSON.stringify(event.candidate));
+        try {
+          await backend.addIceCandidate(BigInt(callId), JSON.stringify(event.candidate));
+        } catch (error) {
+          console.error('Error adding ICE candidate:', error);
+          setSnackbarMessage('Error adding ICE candidate');
+        }
       }
     };
 
@@ -61,7 +67,7 @@ const App: React.FC = () => {
 
     peerConnectionRef.current = pc;
     return pc;
-  };
+  }, [callId]);
 
   const startCall = async () => {
     setIsLoading(true);
@@ -77,11 +83,14 @@ const App: React.FC = () => {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         await backend.sendOffer(BigInt(newCallId), JSON.stringify(offer));
+        setSnackbarMessage('Call started. Waiting for someone to join...');
       } else {
         console.error('Failed to initialize call:', result.err);
+        setSnackbarMessage('Failed to start call');
       }
     } catch (error) {
       console.error('Error starting call:', error);
+      setSnackbarMessage('Error starting call');
     }
     setIsLoading(false);
   };
@@ -97,22 +106,24 @@ const App: React.FC = () => {
         setLocalStream(stream);
         const pc = createPeerConnection();
         stream.getTracks().forEach(track => pc.addTrack(track, stream));
-        const sessionResult = await backend.getCallSession(BigInt(inputCallId));
-        if ('ok' in sessionResult) {
-          const session = sessionResult.ok;
-          if (session.offers[0]) {
-            const offer = JSON.parse(session.offers[0]);
-            await pc.setRemoteDescription(new RTCSessionDescription(offer));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            await backend.sendAnswer(BigInt(inputCallId), JSON.stringify(answer));
-          }
+        const session = result.ok;
+        if (session.offers[0]) {
+          const offer = JSON.parse(session.offers[0]);
+          await pc.setRemoteDescription(new RTCSessionDescription(offer));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          await backend.sendAnswer(BigInt(inputCallId), JSON.stringify(answer));
+          setSnackbarMessage('Joined call successfully');
+        } else {
+          setSnackbarMessage('No offer available. Try again.');
         }
       } else {
         console.error('Failed to join call:', result.err);
+        setSnackbarMessage('Failed to join call');
       }
     } catch (error) {
       console.error('Error joining call:', error);
+      setSnackbarMessage('Error joining call');
     }
     setIsLoading(false);
   };
@@ -137,14 +148,48 @@ const App: React.FC = () => {
           peerConnectionRef.current.close();
           peerConnectionRef.current = null;
         }
+        setSnackbarMessage('Call ended');
       } else {
         console.error('Failed to end call:', result.err);
+        setSnackbarMessage('Failed to end call');
       }
     } catch (error) {
       console.error('Error ending call:', error);
+      setSnackbarMessage('Error ending call');
     }
     setIsLoading(false);
   };
+
+  useEffect(() => {
+    const pollCallSession = async () => {
+      if (!callId) return;
+      try {
+        const result = await backend.getCallSession(BigInt(callId));
+        if ('ok' in result) {
+          const session = result.ok;
+          const pc = peerConnectionRef.current;
+          if (pc) {
+            if (pc.localDescription && pc.localDescription.type === 'offer' && session.answers[1]) {
+              const answer = JSON.parse(session.answers[1]);
+              await pc.setRemoteDescription(new RTCSessionDescription(answer));
+            }
+            session.iceCandidates.forEach((candidates, index) => {
+              if (index !== (pc.localDescription?.type === 'offer' ? 0 : 1)) {
+                candidates.forEach(async (candidate) => {
+                  await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(candidate)));
+                });
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error polling call session:', error);
+      }
+    };
+
+    const intervalId = setInterval(pollCallSession, 1000);
+    return () => clearInterval(intervalId);
+  }, [callId]);
 
   return (
     <Box className="App" sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -197,6 +242,12 @@ const App: React.FC = () => {
           </>
         )}
       </ControlsContainer>
+      <Snackbar
+        open={!!snackbarMessage}
+        autoHideDuration={6000}
+        onClose={() => setSnackbarMessage('')}
+        message={snackbarMessage}
+      />
     </Box>
   );
 };

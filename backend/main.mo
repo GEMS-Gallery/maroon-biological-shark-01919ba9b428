@@ -1,5 +1,4 @@
 import Hash "mo:base/Hash";
-import Iter "mo:base/Iter";
 
 import Text "mo:base/Text";
 import Array "mo:base/Array";
@@ -9,6 +8,7 @@ import HashMap "mo:base/HashMap";
 import Nat "mo:base/Nat";
 import Error "mo:base/Error";
 import Principal "mo:base/Principal";
+import Iter "mo:base/Iter";
 
 actor {
   type CallId = Nat;
@@ -46,7 +46,7 @@ actor {
     #ok(callId)
   };
 
-  public shared(msg) func joinCall(callId: CallId): async Result.Result<(), Text> {
+  public shared(msg) func joinCall(callId: CallId): async Result.Result<CallSession, Text> {
     switch (callSessions.get(callId)) {
       case (null) { #err("Call session not found") };
       case (?session) {
@@ -64,7 +64,7 @@ actor {
           iceCandidates = session.iceCandidates;
         };
         callSessions.put(callId, updatedSession);
-        #ok(())
+        #ok(updatedSession)
       };
     }
   };
